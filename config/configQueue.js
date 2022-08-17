@@ -33,17 +33,6 @@ const jsonConfig = {
           assert: true,
         },
       },
-      exchanges: {
-        [exchangeMetaMap]: configExchange,
-      },
-      bindings: {
-        bindingMetaMap: {
-          source: exchangeMetaMap,
-          destination: queue,
-          destinationType: "queue",
-          bindingKey: routingKeyMetaMap,
-        },
-      },
       subscriptions: {
         fromMetaMap: {
           vhost: "/",
