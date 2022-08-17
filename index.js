@@ -304,8 +304,10 @@ const executeSetMetamapWebhook = async (params) => {
 
 sql.connect(CONFIG, async (error, res) => {
   if (error) {
+    console.log("error", error);
   }
   if (res) {
+    console.log("ok");
     try {
       const broker = await Broker.create(config);
       broker.on("error", console.error);
@@ -315,10 +317,10 @@ sql.connect(CONFIG, async (error, res) => {
       subscription
         .on("message", async (message, content, ackOrNack) => {
           try {
-            const contentString = JSON.stringify(content);
-            await executeSetMetamapWebhook(contentString);
+            await executeSetMetamapWebhook(content);
             ackOrNack(message);
           } catch (error) {
+            console.log('error',error);
             ackOrNack(error, { strategy: "nack" });
           }
         })
