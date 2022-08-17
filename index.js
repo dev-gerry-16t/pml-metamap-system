@@ -316,11 +316,12 @@ sql.connect(CONFIG, async (error, res) => {
 
       subscription
         .on("message", async (message, content, ackOrNack) => {
+          console.log("receive");
           try {
             await executeSetMetamapWebhook(content);
             ackOrNack(message);
           } catch (error) {
-            console.log('error',error);
+            console.log("error", error);
             ackOrNack(error, { strategy: "nack" });
           }
         })
