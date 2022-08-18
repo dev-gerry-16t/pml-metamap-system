@@ -310,6 +310,7 @@ sql.connect(CONFIG, async (error, res) => {
     console.log("ok");
     try {
       const broker = await Broker.create(config);
+      console.log("broker", JSON.stringify(broker, null, 2));
       broker.on("error", console.error);
       broker.on("close", console.error);
       const subscription = await broker.subscribe("fromMetaMap");
@@ -327,7 +328,7 @@ sql.connect(CONFIG, async (error, res) => {
         })
         .on("error", console.error);
     } catch (error) {
-      console.log("error", error);
+      console.log("error catch subscription", error);
     }
   }
 });
