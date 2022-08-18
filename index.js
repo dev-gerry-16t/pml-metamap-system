@@ -310,14 +310,12 @@ sql.connect(CONFIG, async (error, res) => {
     console.log("ok");
     try {
       const broker = await Broker.create(config);
-      console.log("broker", JSON.stringify(broker));
       broker.on("error", console.error);
       broker.on("close", console.error);
       const subscription = await broker.subscribe("fromMetaMap");
 
       subscription
         .on("message", async (message, content, ackOrNack) => {
-          console.log("receive");
           try {
             await executeSetMetamapWebhook(content);
             ackOrNack(message);
