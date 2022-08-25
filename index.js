@@ -2,14 +2,16 @@ import Rascal from "rascal";
 import "dotenv/config";
 import sql from "mssql";
 import AWS from "aws-sdk";
-import config from "./config/configQueue.js";
+import RequestPromise from "request-promise";
 import isNil from "lodash/isNil.js";
+import config from "./config/configQueue.js";
 import isEmpty from "lodash/isEmpty.js";
 import Channel from "./subscriberExchange/subscriber.js";
 import CONFIG from "./database/configDb.js";
 import GLOBAL_CONSTANTS from "./constants/constants.js";
-import RequestPromise from "request-promise";
 import LoggerSystem from "./logger/loggerSystem.js";
+import executeMailTo from "./actions/sendInformationUser.js";
+import createBearerToken from "./actions/createBearerToken.js";
 
 const { BrokerAsPromised: Broker } = Rascal;
 const s3 = new AWS.S3({
@@ -282,7 +284,7 @@ const executeSetMetamapWebhook = async (params) => {
       isEmpty(result.recordset) === false &&
       isNil(result.recordset) === false
         ? result.recordset
-        : {};
+        : [];
     const resultRecordsetObject =
       isEmpty(resultRecordset) === false &&
       isNil(resultRecordset[0]) === false &&
@@ -312,6 +314,28 @@ const executeSetMetamapWebhook = async (params) => {
           bucketSource: element.bucketSource,
           resource: element.resource,
         });
+      }
+      for (const element of resultRecordset) {
+        let arrayPushBar = [];
+        if (element.hasToken === true) {
+          const token = await createBearerToken({
+            idSystemUser: element.idSystemUser,
+            idLoginHistory: element.idLoginHistory,
+            tokenExpiration: element.expireIn,
+          });
+          arrayPushBar = [
+            {
+              name: "nvcToken",
+              content: token,
+            },
+          ];
+        }
+        if (element.canSendEmail === true) {
+          await executeMailTo({
+            ...element,
+            pushVar: arrayPushBar,
+          });
+        }
       }
       if (resultRecordsetObject.canSendWhats === true) {
         try {

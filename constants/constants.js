@@ -24,6 +24,8 @@ const GLOBAL_CONSTANTS = {
   ENVIRONMENT: process.env.ENVIRONMENT,
   NODE_ENV: process.env.NODE_ENV,
   STREAM_LOG: process.env.STREAM_LOG,
+  KEY_MANDRILL: process.env.KEY_MANDRILL,
+  MASTER_KEY_TOKEN: process.env.MASTER_KEY_TOKEN,
 };
 
 export default GLOBAL_CONSTANTS;
