@@ -346,7 +346,7 @@ const executeSetMetamapWebhook = async (params) => {
             rejectUnauthorized: false,
           });
         } catch (error) {
-          LoggerSystem("connect database", CONFIG, {}, error, {
+          LoggerSystem("RequestPromise to /api/v1/message/getMessageScheduled", params, {}, error, {
             container: "pml-metamap-system",
           }).error();
         }
