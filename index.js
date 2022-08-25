@@ -9,6 +9,7 @@ import Channel from "./subscriberExchange/subscriber.js";
 import CONFIG from "./database/configDb.js";
 import GLOBAL_CONSTANTS from "./constants/constants.js";
 import RequestPromise from "request-promise";
+import LoggerSystem from "./logger/loggerSystem.js";
 
 const { BrokerAsPromised: Broker } = Rascal;
 const s3 = new AWS.S3({
@@ -90,9 +91,10 @@ const executeSetMetamapConfig = async (params) => {
         ? resultRecordset[0]
         : [];
     if (resultRecordsetObject.stateCode !== 200) {
-      throw resultRecordsetObject.errorDetail;
+      throw resultRecordsetObject;
     }
   } catch (error) {
+    LoggerSystem(storeProcedure, params, {}, error, locationCode).error();
     throw error;
   }
 };
@@ -134,7 +136,7 @@ const executeGetMetamapConfig = async (params) => {
     let tokenMetaMap = null;
     if (resultRecordsetObject.stateCode !== 200) {
       tokenMetaMap = await executeGetTokenMetaMap({});
-      throw resultRecordsetObject.message;
+      throw resultRecordsetObject;
     } else {
       if (resultRecordsetObject.canBeRefreshed === true) {
         tokenMetaMap = await executeGetTokenMetaMap({
@@ -152,6 +154,7 @@ const executeGetMetamapConfig = async (params) => {
     }
     return tokenMetaMap;
   } catch (error) {
+    LoggerSystem(storeProcedure, params, {}, error, locationCode).error();
     throw error;
   }
 };
@@ -166,8 +169,9 @@ const executeUploadDocument = async (params) => {
 
   const storeProcedure = "docSch.USPsetCustomerInDocument";
   const locationCode = {
-    function: "executeSetCustomerInDocument",
-    file: "systemUser.js",
+    function: "executeUploadDocument",
+    file: "index.js",
+    container: "pml-metamap-system",
   };
   const key = GLOBAL_CONSTANTS.KEY_CUSTOMER_IN_DOCUMENT;
 
@@ -207,7 +211,13 @@ const executeUploadDocument = async (params) => {
       .execute(storeProcedure);
     const resultRecordset = result.recordset[0];
     if (resultRecordset.stateCode !== 200) {
-      throw resultRecordset.errorMessage;
+      LoggerSystem(
+        storeProcedure,
+        params,
+        resultRecordset,
+        resultRecordset.message,
+        locationCode
+      ).warn();
     } else {
       const bufferFile = Buffer.from(response.body, "utf8");
       const paramsFileAws = {
@@ -218,7 +228,7 @@ const executeUploadDocument = async (params) => {
       await s3.upload(paramsFileAws).promise();
     }
   } catch (err) {
-    throw err;
+    LoggerSystem(storeProcedure, params, {}, err, locationCode).error();
   }
 };
 
@@ -287,6 +297,13 @@ const executeSetMetamapWebhook = async (params) => {
         ? result.recordsets[1]
         : [];
     if (resultRecordsetObject.stateCode !== 200) {
+      LoggerSystem(
+        storeProcedure,
+        params,
+        resultRecordset,
+        resultRecordsetObject.message,
+        locationCode
+      ).warn();
       throw resultRecordsetObject.errorMessage;
     } else {
       for (const element of resultUploadDocument) {
@@ -296,6 +313,20 @@ const executeSetMetamapWebhook = async (params) => {
           resource: element.resource,
         });
       }
+      if (resultRecordsetObject.canSendWhats === true) {
+        try {
+          await RequestPromise({
+            url: `${GLOBAL_CONSTANTS.ENVIRONMENT}/api/v1/message/getMessageScheduled?key=${GLOBAL_CONSTANTS.KEY_MESSAGE_SCHEDULED}`,
+            method: "GET",
+            json: true,
+            rejectUnauthorized: false,
+          });
+        } catch (error) {
+          LoggerSystem("connect database", CONFIG, {}, error, {
+            container: "pml-metamap-system",
+          }).error();
+        }
+      }
     }
   } catch (error) {
     throw error;
@@ -304,14 +335,35 @@ const executeSetMetamapWebhook = async (params) => {
 
 sql.connect(CONFIG, async (error, res) => {
   if (error) {
-    console.log("error", error);
+    LoggerSystem("connect database", CONFIG, {}, error, {
+      container: "pml-metamap-system",
+    }).error();
   }
   if (res) {
-    console.log("ok");
+    LoggerSystem("Success connect database", {}, {}, {}, {}).info();
     try {
       const broker = await Broker.create(config);
-      broker.on("error", console.error);
-      broker.on("close", console.error);
+      broker.on("error", (error) => {
+        LoggerSystem("broker error event", config, {}, error, {
+          container: "pml-metamap-system",
+          event: "boker.on(error)",
+        }).error();
+      });
+      broker.on("vhost_initialised", ({ vhost, connectionUrl }) => {
+        LoggerSystem(
+          "broker.on vhost_initialised",
+          {},
+          { vhost, connectionUrl },
+          {},
+          {}
+        ).info();
+      });
+      broker.on("close", (error) => {
+        LoggerSystem("broker close event", {}, {}, error, {
+          container: "pml-metamap-system",
+          event: "boker.on(close)",
+        }).warn();
+      });
       const subscription = await broker.subscribe("fromMetaMap");
 
       subscription
@@ -320,13 +372,23 @@ sql.connect(CONFIG, async (error, res) => {
             await executeSetMetamapWebhook(content);
             ackOrNack(message);
           } catch (error) {
-            console.log("error", error);
+            LoggerSystem("subscription message event", content, {}, error, {
+              container: "pml-metamap-system",
+              event: "subscription.on(message)",
+            }).warn();
             ackOrNack(error, { strategy: "nack" });
           }
         })
-        .on("error", console.error);
+        .on("error", (error) => {
+          LoggerSystem("subscription message event", {}, {}, error, {
+            container: "pml-metamap-system",
+            event: "subscription.on(error)",
+          }).error();
+        });
     } catch (error) {
-      console.log("error catch subscription", error);
+      LoggerSystem("Config broker", config, {}, error, {
+        container: "pml-metamap-system",
+      }).error();
     }
   }
 });
